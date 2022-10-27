@@ -9,9 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.chubasamuel.datadose.data.models.DocLine
 import com.chubasamuel.datadose.data.models.Types
-import com.chubasamuel.datadose.ui.components.Plain
-import com.chubasamuel.datadose.ui.components.SectionLabel
-import com.chubasamuel.datadose.ui.components.Title
+import com.chubasamuel.datadose.ui.components.*
 
 
 @Composable
@@ -24,6 +22,8 @@ fun FillInScreen(
             when(docLines[count].type){
                 Types.Title-> Title(docLine = docLines[count])
                 Types.SectionLabel-> SectionLabel(docLine =  docLines[count])
+                Types.Comment-> Comment(docLine = docLines[count])
+                Types.MCQ-> MCQ(docLine = docLines[count])
                 else-> Plain(docLine =  docLines[count])
             }
             Spacer(Modifier.height(10.dp))

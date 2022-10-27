@@ -1,5 +1,6 @@
 package com.chubasamuel.datadose.util
 
+import android.util.Log
 import com.chubasamuel.datadose.data.models.DocLine
 import com.chubasamuel.datadose.data.models.Options
 import com.chubasamuel.datadose.data.models.Types
@@ -8,14 +9,14 @@ import com.chubasamuel.datadose.data.models.Types
 fun DocLine.classifyLine():DocLine{
     val l=this.label.trim()
      return when{
-         l.startsWith("###")->this.typify(Types.Title)
-         l.startsWith("/*") && l.endsWith("*/")->this.typify(Types.Comment)
-         l.startsWith("##")->this.typify(Types.SectionLabel)
-         l.matches(Regex(".*\\*\\*.+$",RegexOption.IGNORE_CASE))->this.typify(Types.Likert)
-         l.contains(Regex("(@*)+.+$"))->this.typify(Types.MCQRigid)
-         l.matches(Regex(".*@.+@.+$"))&&l.matches(Regex(".*others(please\\s+specify)$"))->this.typify(Types.MCQWithFreeForm)
-         l.contains(Regex("@+"))->this.typify(Types.MCQ)
-         else->this.typify(Types.FreeFormQuestion)
+         l.startsWith("###") -> this.typify(Types.Title).trimOff(Regex("###"))
+         l.startsWith("/*") && l.endsWith("*/") -> this.typify(Types.Comment).trimOff(Regex("/\\*+")).trimOff(Regex("\\*+/"))
+         l.startsWith("##") -> this.typify(Types.SectionLabel).trimOff(Regex("##"))
+         l.matches(Regex(".*\\*\\*.+$")) -> this.typify(Types.Likert)
+         l.matches(Regex(".*(@\\*)+.+$")) -> this.typify(Types.MCQRigid)
+         l.matches(Regex(".*@.+@.+$"))&&l.matches(Regex(".*others\\(please\\s+specify\\).*$",RegexOption.IGNORE_CASE)) -> this.typify(Types.MCQWithFreeForm)
+         l.contains(Regex("@+")) -> this.typify(Types.MCQ)
+         else -> this.typify(Types.FreeFormQuestion)
      }
     }
 private fun DocLine.typify(type: Types):DocLine{
@@ -27,8 +28,11 @@ fun DocLine.isQuestion():Boolean{
         else->true
     }
 }
+private fun DocLine.trimOff(r:Regex):DocLine{
+    return this.copy(label=this.label.replace(r,""))
+}
 fun DocLine.extractOptions():DocLine{
-    if(this.isQuestion())return this
+    if(!this.isQuestion())return this
     return when(this.type){
         Types.Likert->{
             val p=breakLast(this.type,this.label)
@@ -58,14 +62,14 @@ private fun breakLast(type: Types,label:String):Pair<String,String>{
             val k=label.split("@*")
             Pair(k[0],k.slice(1 until k.size).joinToString().replace("*",""))
         }
-        Types.MCQ->{
+        Types.MCQ,Types.MCQWithFreeForm->{
             val k=label.split("@")
-            Pair(k[0],k.slice(1 until k.size).joinToString())
+            Pair(k[0],k.slice(1 until k.size).joinToString("@"))
         }
-        Types.MCQWithFreeForm->{
+        /*Types.MCQWithFreeForm->{
             val k=label.split("@@")
             Pair(k[0],k.slice(1 until k.size-1).joinToString())
-        }
+        }*/
         else->Pair(label,"")
     }
 }
