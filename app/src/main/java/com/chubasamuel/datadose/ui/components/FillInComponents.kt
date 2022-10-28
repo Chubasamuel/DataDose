@@ -1,7 +1,6 @@
 package com.chubasamuel.datadose.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
@@ -15,14 +14,14 @@ import androidx.compose.ui.unit.ExperimentalUnitApi
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
-import com.chubasamuel.datadose.data.models.DocLine
+import com.chubasamuel.datadose.data.local.ProjectDetail
 import com.chubasamuel.datadose.data.models.Options
 import com.google.accompanist.flowlayout.FlowRow
 
 
 @OptIn(ExperimentalUnitApi::class)
 @Composable
-fun Title(docLine: DocLine){
+fun Title(docLine: ProjectDetail){
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center){
         Text(docLine.label,Modifier.fillMaxWidth(),style= TextStyle(
             fontSize = TextUnit(5f, TextUnitType.Em),
@@ -34,7 +33,7 @@ fun Title(docLine: DocLine){
 
 @OptIn(ExperimentalUnitApi::class)
 @Composable
-fun SectionLabel(docLine: DocLine){
+fun SectionLabel(docLine: ProjectDetail){
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center){
         Text(docLine.label,Modifier.fillMaxWidth(),style= TextStyle(
             fontSize = TextUnit(4f, TextUnitType.Em),
@@ -43,9 +42,8 @@ fun SectionLabel(docLine: DocLine){
     }
 }
 
-@OptIn(ExperimentalUnitApi::class)
 @Composable
-fun Comment(docLine: DocLine){
+fun Comment(docLine: ProjectDetail){
     Row(Modifier.fillMaxWidth()){
         Text(text=docLine.label,modifier= Modifier
             .background(color = Color.LightGray, shape = RoundedCornerShape(10.dp))
@@ -53,20 +51,19 @@ fun Comment(docLine: DocLine){
     }
 }
 
-@OptIn(ExperimentalUnitApi::class)
 @Composable
-fun MCQ(docLine: DocLine,isRigid:Boolean=false,isWithFreeForm:Boolean=false){
-    val selections = remember{mutableStateListOf<Int>()}
+fun MCQ(docLine: ProjectDetail,isRigid:Boolean=false,isWithFreeForm:Boolean=false){
+    val selections = remember{ mutableStateMapOf<Int,Options>()}
     Column(Modifier.fillMaxWidth()){
         Text(docLine.label)
         docLine.options?.let{
             OptionsList(selections=selections,options = it, onClick ={
                 ind-> if(isRigid){
-                if(selections.isEmpty()){selections.add(ind)}
-                else{selections[0]=ind}
+                if(selections.isEmpty()){selections[ind]=it[ind-1]}
+                else{selections.clear();selections[ind]=it[ind-1]}
                 }
                 else{ if(selections.contains(ind)){selections.remove(ind)}
-                else{selections.add(ind)}}
+                else{selections[ind]=it[ind-1]}}
             }, isLikert = isRigid )
             if(isWithFreeForm){
                 var freeText by remember{mutableStateOf("")}
@@ -87,7 +84,7 @@ fun MCQ(docLine: DocLine,isRigid:Boolean=false,isWithFreeForm:Boolean=false){
     }
 }
 @Composable
-fun FreeForm(docLine: DocLine){
+fun FreeForm(docLine: ProjectDetail){
     var freeText by remember{mutableStateOf("")}
     Column(Modifier.fillMaxWidth()){
         Text(docLine.label)
@@ -107,21 +104,23 @@ fun FreeForm(docLine: DocLine){
     }
 }
 @Composable
-fun Likert(docLine: DocLine){
-    val selections = remember{mutableStateListOf<Int>()}
+fun Likert(docLine: ProjectDetail){
+    val selections = remember{mutableStateMapOf<Int,Options>()}
     Column(Modifier.fillMaxWidth()){
         Text(docLine.label)
         docLine.options?.let{
             OptionsList(selections = selections, options = it,
-                onClick = {opt->if(selections.isEmpty()){selections.add(opt)}
-                else{selections[0]=opt}
+                onClick = {opt->if(selections.isEmpty()){
+                    selections[opt] = it[opt-1]
+                }
+                else{selections.clear();selections[opt]=it[opt-1]}
             }, isLikert = true)
         }
     }
 }
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
-private fun OptionsList(selections:List<Int>,options:List<Options>,onClick:(Int)->Unit,isLikert:Boolean=false){
+private fun OptionsList(selections:Map<Int,Options>,options:List<Options>,onClick:(Int)->Unit,isLikert:Boolean=false){
      FlowRow(Modifier.fillMaxWidth()){
         for(i in options){
             CompositionLocalProvider(LocalMinimumTouchTargetEnforcement provides false) {
@@ -138,7 +137,7 @@ private fun OptionsList(selections:List<Int>,options:List<Options>,onClick:(Int)
 }
 @OptIn(ExperimentalUnitApi::class)
 @Composable
-fun Plain(docLine: DocLine){
+fun Plain(docLine: ProjectDetail){
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center){
         Text(docLine.label,Modifier.fillMaxWidth(),style= TextStyle(
             fontSize = TextUnit(2.5f, TextUnitType.Em)

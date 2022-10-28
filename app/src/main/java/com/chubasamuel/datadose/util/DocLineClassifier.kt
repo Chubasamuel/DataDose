@@ -66,10 +66,6 @@ private fun breakLast(type: Types,label:String):Pair<String,String>{
             val k=label.split("@")
             Pair(k[0],k.slice(1 until k.size).joinToString("@"))
         }
-        /*Types.MCQWithFreeForm->{
-            val k=label.split("@@")
-            Pair(k[0],k.slice(1 until k.size-1).joinToString())
-        }*/
         else->Pair(label,"")
     }
 }

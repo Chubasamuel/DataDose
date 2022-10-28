@@ -11,10 +11,14 @@ interface AppDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertProject(project:Projects)
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insertProjectDetail(pDetail:ProjectDetail)
+    fun insertProjectDetails(pDetail:List<ProjectDetail>)
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertProjectFilled(pFilled:ProjectFilled)
 
+    @Query("SELECT * FROM projects WHERE title=:project_name LIMIT 1")
+    fun getOneProject(project_name:String):Flow<Projects>
+    @Query("SELECT EXISTS(SELECT title FROM projects WHERE title=:project_name)")
+    fun projectExists(project_name:String):Flow<Boolean>
     @Query("SELECT * FROM projects ORDER BY date_loaded DESC")
     fun getProjects(): Flow<List<Projects>>
     @Query("SELECT * FROM project_detail WHERE project_id=:project_id ORDER BY q_index")

@@ -1,22 +1,39 @@
 package com.chubasamuel.datadose.util
 
 import android.util.Log
-import androidx.sqlite.db.SupportSQLiteDatabase
+import com.chubasamuel.datadose.data.local.AppDao
+import com.chubasamuel.datadose.data.local.ProjectDetail
+import com.chubasamuel.datadose.data.local.Projects
 import com.chubasamuel.datadose.data.models.DocLine
+import com.chubasamuel.datadose.data.models.toProjectDetailEntities
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
 
-class LineReader(bReader: BufferedReader?) {
+
+
+class LineReader(bReader: BufferedReader?, private val dao:AppDao) {
     private val reader:BufferedReader?= bReader
-    fun read():List<DocLine>?{
+    fun save(project_name:String){
+        val scope=CoroutineScope(Dispatchers.IO)
+        val scope2=CoroutineScope(Dispatchers.IO)
+       scope.launch {
+           dao.insertProject(Projects(title=project_name,
+               date_loaded = System.currentTimeMillis()))
+           dao.getOneProject(project_name).collect{
+               it.id?.let { it2->scope2.launch{saveDetails(it2)};scope.cancel() }
+           }
+       }
+    }
+    private fun saveDetails(project_id:Int){
         var index=0
         var indexOnlyQuestion=0
         val res= mutableListOf<DocLine>()
-        if(reader==null)return null
+        if(reader==null)return
         var line: String?
-       return try{
+       try{
             while(true) {
                 line = reader.readLine()
                 if (line != null && line.trim().isEmpty()) continue
@@ -30,10 +47,9 @@ class LineReader(bReader: BufferedReader?) {
                 res.add(docL)
                 Log.w("DCOR DEBUG","type->${docL.type}, label->${docL.label.take(10)}, options->${docL.options}")
             }
-           res
+           dao.insertProjectDetails(res.toProjectDetailEntities(project_id))
         }catch(e:Exception){
             e.printStackTrace()
-           null
         }
         finally {
             reader.close()
@@ -42,37 +58,4 @@ class LineReader(bReader: BufferedReader?) {
     fun close(){
        try{ reader?.close()}catch(e:Exception){e.printStackTrace()}
     }
-    /*
-    fun <T>writeMainTasksToDbDirectly(db:SupportSQLiteDatabase,exporter:ExportData<T>){
-        if(reader==null)return
-        var line: String?
-        try{
-            db.beginTransaction()
-            while(true){
-                line=reader.readLine()
-                if(line!=null&&line.isEmpty())continue
-                if(line==null)break
-
-                val array= line.split(CSVWriter.DEFAULT_SEPARATOR).toTypedArray()
-                val task=MainTasksEntity(startTime = array[0].toLong(),
-                    task=array[1].removeSpecialChars(),duration = array[2].toInt())
-                db.execSQL(BackupUtil.sqlForImportMainTasks,
-                    arrayOf(task.task,task.startTime,task.duration,task.task,task.startTime,task.duration))
-            }
-            reader.close()
-            db.setTransactionSuccessful();db.endTransaction()}
-        catch(e:Exception){
-            try{reader.close();db.setTransactionSuccessful();db.endTransaction()}catch(e:Exception){e.printStackTrace()}
-            CoroutineScope(Dispatchers.Main).launch {
-                exporter.isWriting.value= ExportData.WritingState.ERROR}
-            e.printStackTrace()
-        }
-    }
-    private fun String.removeSpecialChars():String{
-        return this.replace(CSVWriter.ESCAPE_LINE_END,CSVWriter.DEFAULT_LINE_END)
-            .replace(CSVWriter.ESCAPE_DEFAULT_SEPARATOR,CSVWriter.DEFAULT_SEPARATOR)
-    }
-    fun close(){
-        try{ reader?.close()}catch(e:Exception){e.printStackTrace()}
-    }*/
 }

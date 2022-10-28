@@ -3,6 +3,7 @@ package com.chubasamuel.datadose.data.local
 import androidx.annotation.Keep
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.chubasamuel.datadose.data.models.DocLine
 import com.chubasamuel.datadose.data.models.Options
 import com.chubasamuel.datadose.data.models.Types
 
@@ -30,6 +31,6 @@ class ProjectFilled(
     @PrimaryKey(autoGenerate = true) val id:Int?=null,
     val project_id:Int,
     val q_index: Int,
-    val option:Options,
+    val option:List<Options>,
     val indexOnlyForQuestions: Int
 )
