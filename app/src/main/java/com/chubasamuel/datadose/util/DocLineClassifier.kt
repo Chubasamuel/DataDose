@@ -14,7 +14,7 @@ fun DocLine.classifyLine():DocLine{
          l.startsWith("##") -> this.typify(Types.SectionLabel).trimOff(Regex("##"))
          l.matches(Regex(".*\\*\\*.+$")) -> this.typify(Types.Likert)
          l.matches(Regex(".*(@\\*)+.+$")) -> this.typify(Types.MCQRigid)
-         l.matches(Regex(".*@.+@.+$"))&&l.matches(Regex(".*others\\(please\\s+specify\\).*$",RegexOption.IGNORE_CASE)) -> this.typify(Types.MCQWithFreeForm)
+         l.matches(Regex(".*@.+@.+$"))&&l.matches(Regex(".*others\\s*\\(\\s*please\\s+specify\\s*\\).*$",RegexOption.IGNORE_CASE)) -> this.typify(Types.MCQWithFreeForm)
          l.contains(Regex("@+")) -> this.typify(Types.MCQ)
          else -> this.typify(Types.FreeFormQuestion)
      }

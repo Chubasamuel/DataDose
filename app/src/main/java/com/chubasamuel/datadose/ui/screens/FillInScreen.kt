@@ -24,6 +24,10 @@ fun FillInScreen(
                 Types.SectionLabel-> SectionLabel(docLine =  docLines[count])
                 Types.Comment-> Comment(docLine = docLines[count])
                 Types.MCQ-> MCQ(docLine = docLines[count])
+                Types.MCQRigid-> MCQ(docLine=docLines[count],isRigid = true)
+                Types.MCQWithFreeForm-> MCQ(docLine=docLines[count], isWithFreeForm = true)
+                Types.Likert-> Likert(docLine = docLines[count])
+                Types.FreeFormQuestion-> FreeForm(docLine = docLines[count])
                 else-> Plain(docLine =  docLines[count])
             }
             Spacer(Modifier.height(10.dp))
