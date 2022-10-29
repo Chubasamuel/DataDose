@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 import com.chubasamuel.datadose.data.local.ProjectDetail
+import com.chubasamuel.datadose.data.local.ProjectFilled
 import com.chubasamuel.datadose.data.models.Options
 import com.google.accompanist.flowlayout.FlowRow
 
@@ -52,7 +53,8 @@ fun Comment(docLine: ProjectDetail){
 }
 
 @Composable
-fun MCQ(docLine: ProjectDetail,isRigid:Boolean=false,isWithFreeForm:Boolean=false){
+fun MCQ(project_id:Int,
+        tab_index:Int,docLine: ProjectDetail,saver:(ProjectFilled)->Unit,isRigid:Boolean=false,isWithFreeForm:Boolean=false){
     val selections = remember{ mutableStateMapOf<Int,Options>()}
     Column(Modifier.fillMaxWidth()){
         Text(docLine.label)
@@ -64,6 +66,7 @@ fun MCQ(docLine: ProjectDetail,isRigid:Boolean=false,isWithFreeForm:Boolean=fals
                 }
                 else{ if(selections.contains(ind)){selections.remove(ind)}
                 else{selections[ind]=it[ind-1]}}
+                callSaver(project_id,tab_index, selections, docLine, saver)
             }, isLikert = isRigid )
             if(isWithFreeForm){
                 var freeText by remember{mutableStateOf("")}
@@ -84,7 +87,8 @@ fun MCQ(docLine: ProjectDetail,isRigid:Boolean=false,isWithFreeForm:Boolean=fals
     }
 }
 @Composable
-fun FreeForm(docLine: ProjectDetail){
+fun FreeForm(project_id:Int,
+             tab_index:Int,saver:(ProjectFilled)->Unit,docLine: ProjectDetail){
     var freeText by remember{mutableStateOf("")}
     Column(Modifier.fillMaxWidth()){
         Text(docLine.label)
@@ -104,7 +108,8 @@ fun FreeForm(docLine: ProjectDetail){
     }
 }
 @Composable
-fun Likert(docLine: ProjectDetail){
+fun Likert(project_id:Int,
+           tab_index:Int,saver:(ProjectFilled)->Unit,docLine: ProjectDetail){
     val selections = remember{mutableStateMapOf<Int,Options>()}
     Column(Modifier.fillMaxWidth()){
         Text(docLine.label)
@@ -114,7 +119,8 @@ fun Likert(docLine: ProjectDetail){
                     selections[opt] = it[opt-1]
                 }
                 else{selections.clear();selections[opt]=it[opt-1]}
-            }, isLikert = true)
+                    callSaver(project_id,tab_index, selections, docLine, saver)
+                }, isLikert = true)
         }
     }
 }
@@ -134,6 +140,15 @@ private fun OptionsList(selections:Map<Int,Options>,options:List<Options>,onClic
             Spacer(Modifier.width(15.dp))
         }
     }
+}
+private fun callSaver(project_id:Int, tab_index:Int, selections: Map<Int, Options>, docLine: ProjectDetail, saver: (ProjectFilled) -> Unit){
+    saver(ProjectFilled(
+        id="$tab_index${docLine.indexOnlyForQuestions}".toInt(),
+        project_id=project_id,
+        q_index=docLine.q_index,
+        option=selections.values.toList(),
+        indexOnlyForQuestions = docLine.indexOnlyForQuestions
+    ))
 }
 @OptIn(ExperimentalUnitApi::class)
 @Composable

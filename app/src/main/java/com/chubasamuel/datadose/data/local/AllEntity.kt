@@ -28,7 +28,7 @@ class ProjectDetail(
 @Keep
 @Entity(tableName="project_filled")
 class ProjectFilled(
-    @PrimaryKey(autoGenerate = true) val id:Int?=null,
+    @PrimaryKey(autoGenerate = false) val id:Int,
     val project_id:Int,
     val q_index: Int,
     val option:List<Options>,

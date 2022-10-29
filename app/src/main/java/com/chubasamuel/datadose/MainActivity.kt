@@ -11,19 +11,34 @@ import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Scaffold
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.flowWithLifecycle
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.chubasamuel.datadose.data.local.AppDao
 import com.chubasamuel.datadose.data.local.ProjectDetail
+import com.chubasamuel.datadose.data.local.Projects
 import com.chubasamuel.datadose.ui.screens.FillInScreen
+import com.chubasamuel.datadose.ui.screens.FillerScreen
 import com.chubasamuel.datadose.ui.theme.DataDoseTheme
 import com.chubasamuel.datadose.util.LineReader
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.InputStream
 import javax.inject.Inject
 
@@ -39,10 +54,27 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-                   Column(Modifier.fillMaxSize()) {
-                       Row(Modifier.clickable { getImportFileUri() }){Greeting("Android")}
-      //                 Row(Modifier.fillMaxWidth().padding(15.dp)){DoSimple()}
-                   }
+                    val navController= rememberNavController()
+                    NavHost(navController = navController, startDestination = "home") {
+                        composable("home"){
+                            Column(Modifier.fillMaxSize()) {
+                                Row(Modifier.clickable { getImportFileUri() }){Greeting("Android")}
+                                Homer(appDao,{projectId->navController.navigate("filler?project_id=$projectId")})
+                            }
+                        }
+                        composable("filler?project_id={project_id}",
+                            arguments = listOf(navArgument("project_id"){type=
+                            NavType.IntType})){
+                            val projectId=it.arguments?.getInt("project_id",1)?:1
+                            val projectDetail=appDao.getProjectDetail(projectId)
+                           val pp:List<ProjectDetail> by projectDetail.collectAsState(initial =listOf() )
+                            FillerScreen(project_id=projectId, tabsCount = 1000,
+                                saver={filled->
+                                    CoroutineScope(Dispatchers.IO).launch{
+                                    appDao.insertProjectFilled(filled) }},docs=pp)
+                        }
+                    }
+
                    }
             }
         }
@@ -82,6 +114,27 @@ private fun beginFileImport(uri: Uri){
     }
 }
 
+@Composable
+private fun Homer(appDao: AppDao,onClick: (Int) -> Unit){
+    val projects=appDao.getProjects()
+    val pp:List<Projects> by projects.collectAsState(initial = listOf())
+    ProjectsList(projects = pp, onClick = onClick)
+}
+@Composable
+private fun ProjectsList(projects:List<Projects>,onClick:(Int)->Unit){
+    LazyColumn{
+        items(count=projects.size,key={ind->projects[ind].id?:ind}){
+            count->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+                    .clickable { onClick(projects[count].id ?: -1) }){
+                Text(projects[count].title)
+            }
+        }
+    }
+}
 @Composable
 fun Greeting(name: String) {
     Text(text = "Hello $name!")
