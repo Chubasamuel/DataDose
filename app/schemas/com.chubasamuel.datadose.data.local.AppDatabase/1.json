@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "248de38dd5fad9604612e4addcb1c7bb",
+    "identityHash": "09111b2266229c8104505a372c32a4e6",
     "entities": [
       {
         "tableName": "projects",
@@ -94,13 +94,13 @@
       },
       {
         "tableName": "project_filled",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `project_id` INTEGER NOT NULL, `q_index` INTEGER NOT NULL, `option` TEXT NOT NULL, `indexOnlyForQuestions` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `project_id` INTEGER NOT NULL, `q_index` INTEGER NOT NULL, `option` TEXT NOT NULL, `indexOnlyForQuestions` INTEGER NOT NULL, `tab_index` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
             "columnName": "id",
             "affinity": "INTEGER",
-            "notNull": true
+            "notNull": false
           },
           {
             "fieldPath": "project_id",
@@ -125,13 +125,19 @@
             "columnName": "indexOnlyForQuestions",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "tab_index",
+            "columnName": "tab_index",
+            "affinity": "INTEGER",
+            "notNull": true
           }
         ],
         "primaryKey": {
           "columnNames": [
             "id"
           ],
-          "autoGenerate": false
+          "autoGenerate": true
         },
         "indices": [],
         "foreignKeys": []
@@ -140,7 +146,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '248de38dd5fad9604612e4addcb1c7bb')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '09111b2266229c8104505a372c32a4e6')"
     ]
   }
 }

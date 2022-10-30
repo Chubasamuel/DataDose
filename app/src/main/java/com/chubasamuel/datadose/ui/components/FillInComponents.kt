@@ -1,9 +1,14 @@
 package com.chubasamuel.datadose.ui.components
 
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.PauseCircle
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -19,6 +24,7 @@ import com.chubasamuel.datadose.data.local.ProjectFilled
 import com.chubasamuel.datadose.data.models.Options
 import com.google.accompanist.flowlayout.FlowRow
 
+val handler=Handler(Looper.getMainLooper())
 
 @OptIn(ExperimentalUnitApi::class)
 @Composable
@@ -54,8 +60,15 @@ fun Comment(docLine: ProjectDetail){
 
 @Composable
 fun MCQ(project_id:Int,
-        tab_index:Int,docLine: ProjectDetail,saver:(ProjectFilled)->Unit,isRigid:Boolean=false,isWithFreeForm:Boolean=false){
+        tab_index:Int,docLine: ProjectDetail,saver:(ProjectFilled)->Unit,isRigid:Boolean=false,isWithFreeForm:Boolean=false,
+filled:ProjectFilled?
+        ){
     val selections = remember{ mutableStateMapOf<Int,Options>()}
+    if(selections.isEmpty()){filled?.let {
+        for(i in it.option){
+            selections[i.index] = i
+        }
+    }}
     Column(Modifier.fillMaxWidth()){
         Text(docLine.label)
         docLine.options?.let{
@@ -70,6 +83,35 @@ fun MCQ(project_id:Int,
             }, isLikert = isRigid )
             if(isWithFreeForm){
                 var freeText by remember{mutableStateOf("")}
+                if(freeText.isEmpty()){
+                    filled?.let{
+                       it2-> if(it2.option.isNotEmpty()){
+                            freeText=it2.option.last().value?:""
+                        }
+                    }
+                }
+                var textChanged:Boolean? by remember{ mutableStateOf(null) }
+                val runnable by remember {
+                    derivedStateOf { Runnable {
+                        docLine.options.let{
+                           if(docLine.options.isNotEmpty()) {
+                               val kk = docLine.options.last()
+                               selections[kk.index] = Options(kk.index, "", freeText)
+                           }
+                        }
+                        callSaver(
+                            project_id, tab_index,
+                            selections = selections, docLine, saver
+                        )
+                        textChanged=false
+                    }}
+                }
+                fun trySave(){
+                    textChanged=true
+                    handler.removeCallbacks(runnable)
+                    handler.postDelayed(runnable,2000)
+                }
+
                Row(modifier= Modifier
                    .fillMaxWidth()
                    .padding(10.dp), horizontalArrangement = Arrangement.Center){
@@ -81,15 +123,47 @@ fun MCQ(project_id:Int,
                    colors=TextFieldDefaults.textFieldColors(disabledTextColor= Color.Transparent,
                        focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
                        disabledIndicatorColor = Color.Transparent),
-                    onValueChange = { v->freeText=v} )
+                    onValueChange = { v->freeText=v;trySave()},
+                       trailingIcon = {if(textChanged==true){
+                           Icon(Icons.Filled.PauseCircle, null)
+                       }else if(textChanged==false){
+                           Icon(Icons.Filled.Done,null)
+                       } }
+                       )
             }}
         }
     }
+
 }
 @Composable
 fun FreeForm(project_id:Int,
-             tab_index:Int,saver:(ProjectFilled)->Unit,docLine: ProjectDetail){
+             tab_index:Int,saver:(ProjectFilled)->Unit,docLine: ProjectDetail,filled:ProjectFilled?){
     var freeText by remember{mutableStateOf("")}
+    if(freeText.isEmpty()){
+        filled?.let{
+            if(it.option.isNotEmpty()){
+                freeText=it.option[0].value?:""
+            }
+        }
+    }
+
+    var textChanged:Boolean? by remember{ mutableStateOf(null) }
+
+    val runnable by remember {
+        derivedStateOf { Runnable {
+            callSaver(project_id,tab_index,
+                selections = mapOf(0 to Options(
+                    index=0,label="",value=freeText
+                )),docLine, saver)
+            textChanged=false
+        }}
+    }
+    fun trySave(){
+        textChanged=true
+        handler.removeCallbacks(runnable)
+        handler.postDelayed(runnable,2000)
+    }
+
     Column(Modifier.fillMaxWidth()){
         Text(docLine.label)
     Row(modifier= Modifier
@@ -103,14 +177,25 @@ fun FreeForm(project_id:Int,
             colors=TextFieldDefaults.textFieldColors(disabledTextColor= Color.Transparent,
                 focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
                 disabledIndicatorColor = Color.Transparent),
-            onValueChange = { v->freeText=v} )
+            onValueChange = { v->freeText=v; trySave()} ,
+        trailingIcon = {if(textChanged==true){
+            Icon(Icons.Filled.PauseCircle, null)
+        }else if(textChanged==false){
+            Icon(Icons.Filled.Done,null)
+        } })
     }
     }
 }
+
 @Composable
 fun Likert(project_id:Int,
-           tab_index:Int,saver:(ProjectFilled)->Unit,docLine: ProjectDetail){
+           tab_index:Int,saver:(ProjectFilled)->Unit,docLine: ProjectDetail,filled:ProjectFilled?){
     val selections = remember{mutableStateMapOf<Int,Options>()}
+    if(selections.isEmpty()){filled?.let {
+        for(i in it.option){
+            selections[i.index] = i
+        }
+    }}
     Column(Modifier.fillMaxWidth()){
         Text(docLine.label)
         docLine.options?.let{
@@ -143,19 +228,10 @@ private fun OptionsList(selections:Map<Int,Options>,options:List<Options>,onClic
 }
 private fun callSaver(project_id:Int, tab_index:Int, selections: Map<Int, Options>, docLine: ProjectDetail, saver: (ProjectFilled) -> Unit){
     saver(ProjectFilled(
-        id="$tab_index${docLine.indexOnlyForQuestions}".toInt(),
         project_id=project_id,
         q_index=docLine.q_index,
         option=selections.values.toList(),
-        indexOnlyForQuestions = docLine.indexOnlyForQuestions
+        indexOnlyForQuestions = docLine.indexOnlyForQuestions,
+        tab_index = tab_index
     ))
-}
-@OptIn(ExperimentalUnitApi::class)
-@Composable
-fun Plain(docLine: ProjectDetail){
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center){
-        Text(docLine.label,Modifier.fillMaxWidth(),style= TextStyle(
-            fontSize = TextUnit(2.5f, TextUnitType.Em)
-        ))
-    }
 }

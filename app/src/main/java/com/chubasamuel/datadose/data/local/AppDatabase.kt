@@ -7,8 +7,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 
-@Database(entities=[Projects::class,ProjectDetail::class,ProjectFilled::class],version=2, exportSchema = true,
-autoMigrations = [AutoMigration(from=1,to=2)]
+@Database(entities=[Projects::class,ProjectDetail::class,ProjectFilled::class],version=1, exportSchema = true,
+autoMigrations = []
     )
 @TypeConverters(Converters::class)
 abstract class AppDatabase :RoomDatabase(){

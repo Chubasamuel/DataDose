@@ -1,5 +1,6 @@
 package com.chubasamuel.datadose.data.models
 
+import com.chubasamuel.datadose.data.local.Converters
 import com.chubasamuel.datadose.data.local.ProjectDetail
 import com.chubasamuel.datadose.data.local.ProjectFilled
 
@@ -20,6 +21,8 @@ data class Options(
     val label:String,
     var value:String?=null
 )
+fun List<Options>.getJSONString()=Converters().fromLiOfOptions(this)
+
 fun List<DocLine>.toProjectDetailEntities(project_id:Int):List<ProjectDetail>{
     val li= mutableListOf<ProjectDetail>()
     this.forEach { li.add(it.toProjectDetailEntity(project_id)) }
