@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 @Dao
 interface AppDao {
@@ -22,11 +23,17 @@ interface AppDao {
     @Query("SELECT EXISTS(SELECT title FROM projects WHERE title=:project_name)")
     fun projectExists(project_name:String):Flow<Boolean>
     @Query("SELECT * FROM projects ORDER BY date_loaded DESC")
-    fun getProjects(): Flow<List<Projects>>
+    fun getProjectsHelper(): Flow<List<Projects>>
+    fun getProjects()=getProjectsHelper().distinctUntilChanged()
     @Query("SELECT * FROM project_detail WHERE project_id=:project_id ORDER BY q_index")
     fun getProjectDetail(project_id:Int):Flow<List<ProjectDetail>>
     @Query("SELECT * FROM project_filled WHERE project_id=:project_id and tab_index=:tab_index ORDER BY q_index")
-    fun getAllProjectFilledForTab(project_id: Int,tab_index:Int):Flow<List<ProjectFilled>>
+    fun getAllProjectFilledForTabHelper(project_id: Int,tab_index:Int):Flow<List<ProjectFilled>>
+    fun getAllProjectFilledForTab(project_id: Int,tab_index:Int)=getAllProjectFilledForTabHelper(project_id, tab_index).distinctUntilChanged()
     @Query("SELECT * FROM project_filled WHERE project_id=:project_id ORDER BY q_index")
     fun getAllProjectFilled(project_id: Int):Flow<List<ProjectFilled>>
+
+    @Query("SELECT indexOnlyForQuestions from project_detail WHERE project_id=:project_id ORDER BY indexOnlyForQuestions")
+    fun getAllIndexOnlyNumbers(project_id: Int):Flow<List<Int>>
+
 }

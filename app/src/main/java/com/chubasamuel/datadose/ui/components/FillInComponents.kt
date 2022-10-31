@@ -5,6 +5,7 @@ import android.os.Looper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Done
@@ -14,11 +15,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.ExperimentalUnitApi
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import com.chubasamuel.datadose.data.local.ProjectDetail
 import com.chubasamuel.datadose.data.local.ProjectFilled
 import com.chubasamuel.datadose.data.models.Options
@@ -109,7 +112,7 @@ filled:ProjectFilled?
                 fun trySave(){
                     textChanged=true
                     handler.removeCallbacks(runnable)
-                    handler.postDelayed(runnable,2000)
+                    handler.postDelayed(runnable,1200)
                 }
 
                Row(modifier= Modifier
@@ -161,7 +164,7 @@ fun FreeForm(project_id:Int,
     fun trySave(){
         textChanged=true
         handler.removeCallbacks(runnable)
-        handler.postDelayed(runnable,2000)
+        handler.postDelayed(runnable,1200)
     }
 
     Column(Modifier.fillMaxWidth()){
@@ -224,6 +227,41 @@ private fun OptionsList(selections:Map<Int,Options>,options:List<Options>,onClic
             Text(i.label)
             Spacer(Modifier.width(15.dp))
         }
+    }
+}
+
+@Composable
+fun showAlert(title:@Composable ()->Unit,text:@Composable ()->Unit,dialogProperties: DialogProperties=DialogProperties(),onConfirm:()->Unit,onCancel:()->Unit){
+    AlertDialog(onDismissRequest = { onCancel()},
+        confirmButton = {
+            TextButton(onClick = { onConfirm()}) {
+                Text("Okay")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { onCancel()}) {
+                Text("Cancel")
+            }
+        },
+        title = title,
+        text= text,
+        properties = dialogProperties
+        )
+}
+
+@Composable
+fun AlertCustomPage(onTextChange:(String)->Unit,freeText:String,placeholder:String,keyboardOptions:KeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)){
+    Row{
+        TextField(modifier=Modifier.fillMaxWidth(0.95f),
+            shape= RoundedCornerShape(15.dp),
+            value = freeText,
+            placeholder={Text(placeholder)},
+            maxLines=1,
+            colors=TextFieldDefaults.textFieldColors(disabledTextColor= Color.Transparent,
+                focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent),
+            keyboardOptions = keyboardOptions,
+            onValueChange = { v->onTextChange(v);} )
     }
 }
 private fun callSaver(project_id:Int, tab_index:Int, selections: Map<Int, Options>, docLine: ProjectDetail, saver: (ProjectFilled) -> Unit){
