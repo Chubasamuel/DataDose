@@ -100,11 +100,11 @@ fun FillerScreen(project_id: Int,tabsCount:Int,saver:(ProjectFilled)->Unit,
                 Text("Enter page number to move to",
                 style=TextStyle(fontWeight = FontWeight.Bold)) }},
             text = {
-                AlertCustomPage(onTextChange ={s->freeText=s} , freeText = freeText, placeholder = "A number between 1 and 1000")
+                AlertCustomPage(onTextChange ={s->freeText=s} , freeText = freeText, placeholder = "A number between 1 and $tabsCount")
             },
             onConfirm = {
                 val p=tryGetInt(freeText)
-                if(p in 1..1000){
+                if(p in 1..tabsCount){
                    cScope.launch { pagerState.scrollToPage(p-1) }
                 }
                 showDialog=false

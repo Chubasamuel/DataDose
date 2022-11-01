@@ -25,6 +25,8 @@ interface AppDao {
     @Query("SELECT * FROM projects ORDER BY date_loaded DESC")
     fun getProjectsHelper(): Flow<List<Projects>>
     fun getProjects()=getProjectsHelper().distinctUntilChanged()
+    @Query("SELECT * FROM projects ORDER BY date_loaded DESC")
+    fun getProjectsForCountHelper(): List<Projects>
     @Query("SELECT * FROM project_detail WHERE project_id=:project_id ORDER BY q_index")
     fun getProjectDetail(project_id:Int):Flow<List<ProjectDetail>>
     @Query("SELECT * FROM project_filled WHERE project_id=:project_id and tab_index=:tab_index ORDER BY q_index")
@@ -32,7 +34,19 @@ interface AppDao {
     fun getAllProjectFilledForTab(project_id: Int,tab_index:Int)=getAllProjectFilledForTabHelper(project_id, tab_index).distinctUntilChanged()
     @Query("SELECT * FROM project_filled WHERE project_id=:project_id ORDER BY q_index")
     fun getAllProjectFilled(project_id: Int):Flow<List<ProjectFilled>>
-
+    @Query("SELECT COUNT(DISTINCT tab_index) FROM project_filled WHERE project_id=:project_id")
+    fun getProjectFilledCountHelper(project_id: Int):Int
+    suspend fun getAllProjectFilledCount():Map<Int,Int>{
+        val projects=getProjectsForCountHelper()
+        val map = mutableMapOf<Int,Int>()
+        for(p in projects){
+            p.id?.let{
+                val c=getProjectFilledCountHelper(it)
+                map[it]=c
+            }
+        }
+        return map
+    }
     @Query("SELECT indexOnlyForQuestions from project_detail WHERE project_id=:project_id ORDER BY indexOnlyForQuestions")
     fun getAllIndexOnlyNumbers(project_id: Int):Flow<List<Int>>
 

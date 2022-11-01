@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Upload
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.TextStyle
@@ -47,9 +48,12 @@ import com.chubasamuel.datadose.ui.components.AlertCustomPage
 import com.chubasamuel.datadose.ui.components.showAlert
 import com.chubasamuel.datadose.ui.screens.FillerScreen
 import com.chubasamuel.datadose.ui.theme.DataDoseTheme
+import com.chubasamuel.datadose.ui.theme.buttonColor
+import com.chubasamuel.datadose.ui.theme.statusBarColor
 import com.chubasamuel.datadose.util.DCORPrefs
 import com.chubasamuel.datadose.util.LineReader
 import com.chubasamuel.datadose.util.XlsUtil
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -72,8 +76,13 @@ class MainActivity : ComponentActivity() {
     )
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val coroutineScope=CoroutineScope(Dispatchers.IO)
         setContent {
             DataDoseTheme {
+                val systemUiController= rememberSystemUiController()
+                LaunchedEffect(Unit){
+                    systemUiController.setStatusBarColor(color=statusBarColor)
+                }
                 // A surface container using the 'background' color from the theme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -85,6 +94,7 @@ class MainActivity : ComponentActivity() {
                             val projects by remember {
                                 derivedStateOf { appDao.getProjects() }
                             }
+                            val projectsFilledCount = remember { mutableStateMapOf<Int,Int>() }
                             val pp:List<Projects> by projects.collectAsStateWithLifecycle(initialValue = listOf())
                             val isByValue by remember{ derivedStateOf { dcorPrefs.getExportTypeByValue() }}
                             var isChecked by remember{ mutableStateOf(isByValue)}
@@ -114,7 +124,7 @@ class MainActivity : ComponentActivity() {
                                             }
                                         }
                                 }
-                                Homer(pp,{projectId->navController.navigate("filler?project_id=$projectId")},
+                                Homer(pp,projectsFilledCount,{projectId->navController.navigate("filler?project_id=$projectId")},
                                     {projectId-> curProjId=projectId;getExportFileUri()})
                             }
                             if(showDialogForName){
@@ -140,6 +150,13 @@ class MainActivity : ComponentActivity() {
                                     onCancel = { showDialogForName = false}
                                 )
                             }
+
+                            LaunchedEffect(Unit){
+                               coroutineScope.launch{
+                                   val filledCountMap = appDao.getAllProjectFilledCount()
+                                   projectsFilledCount.putAll(filledCountMap)
+                               }
+                            }
                         }
                         composable("filler?project_id={project_id}",
                             arguments = listOf(navArgument("project_id"){type=
@@ -153,7 +170,7 @@ class MainActivity : ComponentActivity() {
                                 saver= {filled->
                                     CoroutineScope(Dispatchers.IO).launch{
                                     appDao.insertProjectFilled(appDatabase.openHelper.writableDatabase,filled.getSQLInsertQuery()) }},docs=pp,
-                                getFilled = appDao::getAllProjectFilledForTab /*{project_id,tab_index->appDao.getAllProjectFilledForTab(project_id, tab_index)}*/
+                                getFilled = appDao::getAllProjectFilledForTab
                                 )
                         }
                     }
@@ -214,38 +231,48 @@ private fun beginFileExport(uri: Uri,project_id:Int){
 }
 
 @Composable
-private fun Homer(projects: List<Projects>, onClick: (Int) -> Unit, onClickExport: (Int) -> Unit){
-    ProjectsList(projects = projects, onClick = onClick, onClickExport = onClickExport)
+private fun Homer(projects: List<Projects>,projectsFilledCount:Map<Int,Int>, onClick: (Int) -> Unit, onClickExport: (Int) -> Unit){
+    ProjectsList(projects = projects,projectsFilledCount=projectsFilledCount, onClick = onClick, onClickExport = onClickExport)
 }
 @Composable
-private fun ProjectsList(projects:List<Projects>,onClick:(Int)->Unit,onClickExport:(Int)->Unit){
+private fun ProjectsList(projects:List<Projects>,projectsFilledCount:Map<Int,Int>,onClick:(Int)->Unit,onClickExport:(Int)->Unit){
     LazyColumn(Modifier.padding(horizontal=15.dp)){
         items(count=projects.size,key={ind->projects[ind].id?:ind}){
             count->
-            ProjectNameCard(project = projects[count], onClick = onClick, onClickExport = onClickExport )
+            val pFc by remember{derivedStateOf{projectsFilledCount[projects[count].id]?:0}}
+            ProjectNameCard(project = projects[count],projectFilledCount=pFc, onClick = onClick, onClickExport = onClickExport )
             Spacer(Modifier.height(10.dp))
         }
     }
 }
 @Composable
-private fun ProjectNameCard(project:Projects,onClick:(Int)->Unit,onClickExport:(Int)->Unit){
-    Row(
+private fun ProjectNameCard(project:Projects,projectFilledCount:Int,onClick:(Int)->Unit,onClickExport:(Int)->Unit){
+    val pFc by remember { mutableStateOf(projectFilledCount)}
+    Column(
         Modifier
             .fillMaxWidth()
-            .background(color=Color(0xFFDDFFDD),shape= RoundedCornerShape(20.dp))
+            .background(color = Color(0xFFDDFFDD), shape = RoundedCornerShape(20.dp))
             .padding(8.dp)
+            .clickable { onClick(project.id ?: -1) }
             ,
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
     ){
+        Row( horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically){
         Text(project.title,
             Modifier
-                .clickable { onClick(project.id ?: -1) }
-                .weight(1f).padding(vertical=10.dp))
-        Button(onClick = { onClickExport(project.id?:-1) }) {
+                .weight(1f)
+                .padding(vertical = 10.dp),
+        style=TextStyle(fontWeight = FontWeight.Bold))
+        Button(onClick = { onClickExport(project.id?:-1) }, colors = buttonColor) {
             Icon(Icons.Filled.Upload,null)
             Spacer(Modifier.width(5.dp))
             Text("Export")
+        }}
+        if(pFc>0){
+            val sLabel=if(pFc==1) "response" else "responses"
+            Text("$pFc $sLabel filled",modifier=Modifier.fillMaxWidth(),
+                style= TextStyle(fontStyle = FontStyle.Italic, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            )
         }
     }
 }
