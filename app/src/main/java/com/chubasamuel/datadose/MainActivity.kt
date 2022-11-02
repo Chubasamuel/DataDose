@@ -69,6 +69,8 @@ private var newProjectUri:Uri?=null
 class MainActivity : ComponentActivity() {
     @Inject lateinit var appDao: AppDao
     @Inject lateinit var appDatabase: AppDatabase
+    private val coroutineScope=CoroutineScope(Dispatchers.IO)
+
     @OptIn(ExperimentalLifecycleComposeApi::class, ExperimentalMaterialApi::class)
     @Inject lateinit var dcorPrefs: DCORPrefs
     @OptIn(ExperimentalLifecycleComposeApi::class, ExperimentalMaterialApi::class,
@@ -76,7 +78,6 @@ class MainActivity : ComponentActivity() {
     )
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val coroutineScope=CoroutineScope(Dispatchers.IO)
         setContent {
             DataDoseTheme {
                 val systemUiController= rememberSystemUiController()
@@ -144,7 +145,7 @@ class MainActivity : ComponentActivity() {
                                         )
                                     },
                                     onConfirm = {
-                                        beginFileImport()
+                                        beginFileImport(coroutineScope)
                                        showDialogForName=false
                                     },
                                     onCancel = { showDialogForName = false}
@@ -195,16 +196,18 @@ private fun getExportFileUri(){
     }
     startForResultExport.launch(intent)
 }
-private fun beginFileImport(){
+private fun beginFileImport(scope:CoroutineScope){
     newProjectUri?.let {
         val inp = contentResolver.openInputStream(it)?.bufferedReader() ?: return
         val lineReader = LineReader(inp, appDao)
-        lineReader.save(newProjName)
+       scope.launch { lineReader.save(newProjName).collect{}}
     }
 }
-private fun beginFileExport(uri: Uri,project_id:Int){
+private fun beginFileExport(uri: Uri,project_id:Int,scope: CoroutineScope){
     val os=contentResolver.openOutputStream(uri)?.buffered()?:return
-    XlsUtil.exportFilledOptionsToXlsx(this,project_id,os,appDao,dcorPrefs.getExportTypeByValue())
+    scope.launch{
+        XlsUtil.exportFilledOptionsToXlsx(this@MainActivity,project_id,os,appDao,dcorPrefs.getExportTypeByValue())
+        .collect{}}
 }
     private val startForResult=registerForActivityResult(ActivityResultContracts.StartActivityForResult()){
         result:ActivityResult->
@@ -223,7 +226,7 @@ private fun beginFileExport(uri: Uri,project_id:Int){
         when(result.resultCode){
             Activity.RESULT_OK->{
                 val uri=res?.data
-                uri?.let{beginFileExport(it,curProjId)}
+                uri?.let{beginFileExport(it,curProjId,coroutineScope)}
             }
             else->{}
         }
@@ -248,13 +251,14 @@ private fun ProjectsList(projects:List<Projects>,projectsFilledCount:Map<Int,Int
 @Composable
 private fun ProjectNameCard(project:Projects,projectFilledCount:Int,onClick:(Int)->Unit,onClickExport:(Int)->Unit){
     val pFc by remember { mutableStateOf(projectFilledCount)}
+    val projId by remember {derivedStateOf{project.id ?: -1}}
     Column(
         Modifier
             .fillMaxWidth()
-            .background(color = Color(0xFFDDFFDD), shape = RoundedCornerShape(20.dp))
+            .background(color = Color(0xFFDDFFDD), shape = RoundedCornerShape(15.dp))
+            .clickable { onClick(projId) }
+            .clip(RoundedCornerShape(15.dp))
             .padding(8.dp)
-            .clickable { onClick(project.id ?: -1) }
-            ,
     ){
         Row( horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically){
@@ -263,7 +267,7 @@ private fun ProjectNameCard(project:Projects,projectFilledCount:Int,onClick:(Int
                 .weight(1f)
                 .padding(vertical = 10.dp),
         style=TextStyle(fontWeight = FontWeight.Bold))
-        Button(onClick = { onClickExport(project.id?:-1) }, colors = buttonColor) {
+        Button(onClick = { onClickExport(projId) }, colors = buttonColor) {
             Icon(Icons.Filled.Upload,null)
             Spacer(Modifier.width(5.dp))
             Text("Export")

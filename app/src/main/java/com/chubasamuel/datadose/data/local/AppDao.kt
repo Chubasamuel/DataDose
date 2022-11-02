@@ -48,6 +48,6 @@ interface AppDao {
         return map
     }
     @Query("SELECT indexOnlyForQuestions from project_detail WHERE project_id=:project_id ORDER BY indexOnlyForQuestions")
-    fun getAllIndexOnlyNumbers(project_id: Int):Flow<List<Int>>
+    suspend fun getAllIndexOnlyNumbers(project_id: Int):List<Int>
 
 }
