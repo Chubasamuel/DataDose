@@ -2,6 +2,7 @@ package com.chubasamuel.datadose.ui.components
 
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -85,14 +86,15 @@ filled:ProjectFilled?
                 callSaver(project_id,tab_index, selections, docLine, saver)
             }, isLikert = isRigid )
             if(isWithFreeForm){
-                var freeText by remember{mutableStateOf("")}
-                if(freeText.isEmpty()){
-                    filled?.let{
-                       it2-> if(it2.option.isNotEmpty()){
-                            freeText=it2.option.last().value?:""
-                        }
-                    }
-                }
+                val ft by remember {derivedStateOf{
+                    if(filled==null){""}else{
+                        if(filled.option.isNotEmpty()){
+                            filled.option.last().value?:""
+                        }else{
+                            ""
+                        }}
+                }}
+                var freeText by remember{ mutableStateOf(ft) }
                 var textChanged:Boolean? by remember{ mutableStateOf(null) }
                 val runnable by remember {
                     derivedStateOf { Runnable {
@@ -141,14 +143,15 @@ filled:ProjectFilled?
 @Composable
 fun FreeForm(project_id:Int,
              tab_index:Int,saver:(ProjectFilled)->Unit,docLine: ProjectDetail,filled:ProjectFilled?){
-    var freeText by remember{mutableStateOf("")}
-    if(freeText.isEmpty()){
-        filled?.let{
-            if(it.option.isNotEmpty()){
-                freeText=it.option[0].value?:""
-            }
-        }
-    }
+    val ft by remember {derivedStateOf{
+        if(filled==null){""}else{
+             if(filled.option.isNotEmpty()){
+                filled.option[0].value?:""
+            }else{
+                ""
+            }}
+    }}
+    var freeText by remember{ mutableStateOf(ft) }
 
     var textChanged:Boolean? by remember{ mutableStateOf(null) }
 
@@ -189,7 +192,6 @@ fun FreeForm(project_id:Int,
     }
     }
 }
-
 @Composable
 fun Likert(project_id:Int,
            tab_index:Int,saver:(ProjectFilled)->Unit,docLine: ProjectDetail,filled:ProjectFilled?){
