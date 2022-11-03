@@ -1,10 +1,10 @@
 package com.chubasamuel.datadose
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResult
@@ -34,50 +34,63 @@ import androidx.compose.ui.unit.ExperimentalUnitApi
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.ExperimentalLifecycleComposeApi
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.flowWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.chubasamuel.datadose.data.local.*
-import com.chubasamuel.datadose.ui.components.AlertCustomPage
-import com.chubasamuel.datadose.ui.components.showAlert
+import com.chubasamuel.datadose.data.models.APIModels
+import com.chubasamuel.datadose.data.models.WorkStatus
+import com.chubasamuel.datadose.data.remote.GetUpdates
+import com.chubasamuel.datadose.ui.components.*
 import com.chubasamuel.datadose.ui.screens.FillerScreen
 import com.chubasamuel.datadose.ui.theme.DataDoseTheme
 import com.chubasamuel.datadose.ui.theme.buttonColor
 import com.chubasamuel.datadose.ui.theme.statusBarColor
 import com.chubasamuel.datadose.util.DCORPrefs
 import com.chubasamuel.datadose.util.LineReader
+import com.chubasamuel.datadose.util.UpdatesUtil
 import com.chubasamuel.datadose.util.XlsUtil
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-var curProjId:Int=-1
-private var showDialogForName by mutableStateOf(false)
-private var newProjName = "DefaultName"
-private var newProjectUri:Uri?=null
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject lateinit var appDao: AppDao
     @Inject lateinit var appDatabase: AppDatabase
+    @Inject lateinit var dcorPrefs: DCORPrefs
+    @Inject lateinit var appContext:Context
+    @Inject lateinit var getUpdates: GetUpdates
+
+    var curProjId:Int=-1
+    private var showDialogForName by mutableStateOf(false)
+    private var newProjName = "DefaultName"
+    private var newProjectUri:Uri?=null
+    private var workStatus:WorkStatus by mutableStateOf(WorkStatus.Waiting())
+
     private val coroutineScope=CoroutineScope(Dispatchers.IO)
 
-    @OptIn(ExperimentalLifecycleComposeApi::class, ExperimentalMaterialApi::class)
-    @Inject lateinit var dcorPrefs: DCORPrefs
+     private var appUpdateM:APIModels.APIUpdates? by mutableStateOf(null)
+     private var devUpdateM:APIModels.APIUpdates? by mutableStateOf(null)
+     private fun resetAppUpdate(){appUpdateM=null}
+     private fun resetDevUpdate(){devUpdateM=null}
+
     @OptIn(ExperimentalLifecycleComposeApi::class, ExperimentalMaterialApi::class,
         ExperimentalUnitApi::class
     )
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        coroutineScope.launch {
+            appUpdateM = UpdatesUtil.mainGetAppUpdate(appContext,dcorPrefs)
+            devUpdateM = UpdatesUtil.mainGetDevUpdate(dcorPrefs) }
         setContent {
             DataDoseTheme {
                 val systemUiController= rememberSystemUiController()
@@ -85,6 +98,8 @@ class MainActivity : ComponentActivity() {
                     systemUiController.setStatusBarColor(color=statusBarColor)
                 }
                 // A surface container using the 'background' color from the theme
+                val scaffoldState= rememberScaffoldState()
+                Scaffold(scaffoldState=scaffoldState) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
@@ -126,10 +141,10 @@ class MainActivity : ComponentActivity() {
                                         }
                                 }
                                 Homer(pp,projectsFilledCount,{projectId->navController.navigate("filler?project_id=$projectId")},
-                                    {projectId-> curProjId=projectId;getExportFileUri()})
+                                    {projectId,projectName-> curProjId=projectId;getExportFileUri(projectName)})
                             }
+                            var inputNewProjName by remember { mutableStateOf("") }
                             if(showDialogForName){
-                                var freeText by remember { mutableStateOf("") }
                                 showAlert(title = {
                                     Column(
                                         Modifier
@@ -139,8 +154,8 @@ class MainActivity : ComponentActivity() {
                                             style= TextStyle(fontWeight = FontWeight.Bold)
                                         ) }},
                                     text = {
-                                        AlertCustomPage(onTextChange ={s->freeText=s;newProjName=s; } ,
-                                            freeText = freeText, placeholder = "A unique name..",
+                                        AlertCustomPage(onTextChange ={s->inputNewProjName=s; newProjName=s; } ,
+                                            freeText = inputNewProjName, placeholder = "A unique name..",
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
                                         )
                                     },
@@ -151,7 +166,27 @@ class MainActivity : ComponentActivity() {
                                     onCancel = { showDialogForName = false}
                                 )
                             }
-
+                            val showProgress by remember{derivedStateOf{workStatus is WorkStatus.Working}}
+                            if(showProgress){
+                                val statusText by remember {derivedStateOf{
+                                    val kp=workStatus
+                                    if(kp is WorkStatus.Working) kp.statusMessage
+                                    else null
+                                }}
+                                indeterminateProgress(statusText)}
+                            AppUpdateComponent(update = appUpdateM,resetVal={resetAppUpdate()},
+                                saveLast={UpdatesUtil.saveLastAppUpdateInformed(dcorPrefs)},
+                                launchPlayStore = {UpdatesUtil.launchPlayStore(appContext)},
+                                showSnackBar={msg->coroutineScope.launch {
+                                   val snackbarResult = scaffoldState.snackbarHostState.showSnackbar(message=msg,actionLabel="Update")
+                                    when(snackbarResult){
+                                        SnackbarResult.ActionPerformed->UpdatesUtil.launchPlayStore(appContext)
+                                        else->{}
+                                    }
+                                } }
+                                )
+                            DevUpdateComponent(update = devUpdateM,resetVal={resetDevUpdate()},
+                                saveLast={UpdatesUtil.saveLastDevUpdateInformed(dcorPrefs)})
                             LaunchedEffect(Unit){
                                coroutineScope.launch{
                                    val filledCountMap = appDao.getAllProjectFilledCount()
@@ -178,9 +213,12 @@ class MainActivity : ComponentActivity() {
 
                    }
             }
-        }
+        }}
+        checkForApiUpdates(getUpdates, dcorPrefs)
     }
-
+private fun checkForApiUpdates(getUpdates: GetUpdates,dcorPrefs: DCORPrefs){
+    UpdatesUtil.checkForUpdatesFromAPI(getUpdates, dcorPrefs)
+}
 private fun getImportFileUri(){
     val intent=Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
         addCategory(Intent.CATEGORY_OPENABLE)
@@ -188,11 +226,11 @@ private fun getImportFileUri(){
     }
     startForResult.launch(intent)
 }
-private fun getExportFileUri(){
+private fun getExportFileUri(title:String){
     val intent=Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
         addCategory(Intent.CATEGORY_OPENABLE)
         type= "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        putExtra(Intent.EXTRA_TITLE,"Dummy-name.xlsx")
+        putExtra(Intent.EXTRA_TITLE,"$title.xlsx")
     }
     startForResultExport.launch(intent)
 }
@@ -200,14 +238,16 @@ private fun beginFileImport(scope:CoroutineScope){
     newProjectUri?.let {
         val inp = contentResolver.openInputStream(it)?.bufferedReader() ?: return
         val lineReader = LineReader(inp, appDao)
-       scope.launch { lineReader.save(newProjName).collect{}}
+       scope.launch { lineReader.save(newProjName).collect{ it2->workStatus=it2}}
     }
 }
-private fun beginFileExport(uri: Uri,project_id:Int,scope: CoroutineScope){
+private fun beginFileExport( uri: Uri, project_id:Int, scope: CoroutineScope){
     val os=contentResolver.openOutputStream(uri)?.buffered()?:return
     scope.launch{
-        XlsUtil.exportFilledOptionsToXlsx(this@MainActivity,project_id,os,appDao,dcorPrefs.getExportTypeByValue())
-        .collect{}}
+        XlsUtil.exportFilledOptionsToXlsx(appContext,project_id,os,appDao,dcorPrefs.getExportTypeByValue())
+        .collect{
+            workStatus=it
+        }}
 }
     private val startForResult=registerForActivityResult(ActivityResultContracts.StartActivityForResult()){
         result:ActivityResult->
@@ -234,11 +274,11 @@ private fun beginFileExport(uri: Uri,project_id:Int,scope: CoroutineScope){
 }
 
 @Composable
-private fun Homer(projects: List<Projects>,projectsFilledCount:Map<Int,Int>, onClick: (Int) -> Unit, onClickExport: (Int) -> Unit){
+private fun Homer(projects: List<Projects>,projectsFilledCount:Map<Int,Int>, onClick: (Int) -> Unit, onClickExport: (Int,String) -> Unit){
     ProjectsList(projects = projects,projectsFilledCount=projectsFilledCount, onClick = onClick, onClickExport = onClickExport)
 }
 @Composable
-private fun ProjectsList(projects:List<Projects>,projectsFilledCount:Map<Int,Int>,onClick:(Int)->Unit,onClickExport:(Int)->Unit){
+private fun ProjectsList(projects:List<Projects>,projectsFilledCount:Map<Int,Int>,onClick:(Int)->Unit,onClickExport:(Int,String)->Unit){
     LazyColumn(Modifier.padding(horizontal=15.dp)){
         items(count=projects.size,key={ind->projects[ind].id?:ind}){
             count->
@@ -248,16 +288,18 @@ private fun ProjectsList(projects:List<Projects>,projectsFilledCount:Map<Int,Int
         }
     }
 }
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
-private fun ProjectNameCard(project:Projects,projectFilledCount:Int,onClick:(Int)->Unit,onClickExport:(Int)->Unit){
+private fun ProjectNameCard(project:Projects,projectFilledCount:Int,onClick:(Int)->Unit,onClickExport:(Int,String)->Unit){
     val pFc by remember { mutableStateOf(projectFilledCount)}
     val projId by remember {derivedStateOf{project.id ?: -1}}
+    Surface(modifier = Modifier
+        .fillMaxWidth()
+        .padding(8.dp),shape=RoundedCornerShape(15.dp),color = Color(0xFFDDFFDD),
+        onClick = {onClick(projId) }){
     Column(
         Modifier
             .fillMaxWidth()
-            .background(color = Color(0xFFDDFFDD), shape = RoundedCornerShape(15.dp))
-            .clickable { onClick(projId) }
-            .clip(RoundedCornerShape(15.dp))
             .padding(8.dp)
     ){
         Row( horizontalArrangement = Arrangement.SpaceBetween,
@@ -267,7 +309,7 @@ private fun ProjectNameCard(project:Projects,projectFilledCount:Int,onClick:(Int
                 .weight(1f)
                 .padding(vertical = 10.dp),
         style=TextStyle(fontWeight = FontWeight.Bold))
-        Button(onClick = { onClickExport(projId) }, colors = buttonColor) {
+        Button(onClick = { onClickExport(projId,project.title) }, colors = buttonColor) {
             Icon(Icons.Filled.Upload,null)
             Spacer(Modifier.width(5.dp))
             Text("Export")
@@ -278,8 +320,10 @@ private fun ProjectNameCard(project:Projects,projectFilledCount:Int,onClick:(Int
                 style= TextStyle(fontStyle = FontStyle.Italic, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             )
         }
-    }
+    }}
 }
+
+
 @Composable
 fun Greeting(name: String) {
     Text(text = "Hello $name!")

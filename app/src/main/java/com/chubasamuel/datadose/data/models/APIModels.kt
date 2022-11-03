@@ -24,4 +24,10 @@ object APIModels {
         val  dev_btn_okay_text: String
     )
 
+    sealed interface APIUpdates{
+        data class ForceFulAlert(val title:String,val message:String):APIUpdates
+        data class NormalAlert(val title:String,val message:String):APIUpdates
+        data class SnackBar(val message:String):APIUpdates
+    }
 }
+

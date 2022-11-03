@@ -22,9 +22,8 @@ class LineReader(bReader: BufferedReader?, private val dao:AppDao) {
     private val reader:BufferedReader?= bReader
     fun save(project_name:String): Flow<WorkStatus> {
         return callbackFlow {
-            trySend(WorkStatus.Working())
+            trySend(WorkStatus.Working("Importing project.."))
         val scope=CoroutineScope(Dispatchers.IO)
-        //val scope2=CoroutineScope(Dispatchers.IO)
        scope.launch {
            dao.insertProject(Projects(title=project_name,
                date_loaded = System.currentTimeMillis()))
